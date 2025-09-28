@@ -1,0 +1,159 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  firstName     String
+  lastName      String
+  username      String   @unique
+  password      String
+  pin           String
+  major         String
+  dateOfBirth   DateTime
+  startYear     Int
+  profilePicture String?
+  bio           String?
+  isActive      Boolean  @default(true)
+  lastSeen      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  posts         Post[]
+  comments      Comment[]
+  sentMessages  Message[] @relation("MessageSender")
+  receivedMessages Message[] @relation("MessageRecipient")
+  
+  // Self-referential relations for friends and blocked users
+  friends       UserFriend[] @relation("UserFriends")
+  friendOf      UserFriend[] @relation("FriendOf")
+  blockedUsers  UserBlock[] @relation("UserBlocks")
+  blockedBy     UserBlock[] @relation("BlockedBy")
+  
+  // Post interactions
+  likedPosts    PostLike[]
+  likedComments CommentLike[]
+
+  @@map("users")
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  content   String
+  images    String[]
+  isPublic  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  comments  Comment[]
+  likes     PostLike[]
+
+  @@map("posts")
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  postId        String
+  authorId      String
+  content       String
+  parentCommentId String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parentComment Comment?  @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       Comment[] @relation("CommentReplies")
+  likes         CommentLike[]
+
+  @@map("comments")
+}
+
+model Message {
+  id          String   @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String
+  messageType MessageType @default(TEXT)
+  isRead      Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  sender      User @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model UserFriend {
+  id       String @id @default(cuid())
+  userId   String
+  friendId String
+
+  // Relations
+  user     User @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friend   User @relation("FriendOf", fields: [friendId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendId])
+  @@map("user_friends")
+}
+
+model UserBlock {
+  id        String @id @default(cuid())
+  userId    String
+  blockedId String
+
+  // Relations
+  user      User @relation("UserBlocks", fields: [userId], references: [id], onDelete: Cascade)
+  blocked   User @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, blockedId])
+  @@map("user_blocks")
+}
+
+model PostLike {
+  id     String @id @default(cuid())
+  userId String
+  postId String
+
+  // Relations
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post   Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@map("post_likes")
+}
+
+model CommentLike {
+  id        String @id @default(cuid())
+  userId    String
+  commentId String
+
+  // Relations
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@map("comment_likes")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
